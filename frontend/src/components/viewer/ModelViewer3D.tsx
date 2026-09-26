@@ -64,6 +64,7 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
   onSelectChangeRecord,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasMountRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -136,8 +137,8 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
 
   // Initialize Three.js Scene
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const mount = canvasMountRef.current;
+    if (!mount) return;
 
     // 1. Scene
     const scene = new THREE.Scene();
@@ -145,7 +146,9 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
     sceneRef.current = scene;
 
     // 2. Camera
-    const aspect = container.clientWidth / Math.max(1, container.clientHeight);
+    const width = mount.clientWidth || containerRef.current?.clientWidth || 800;
+    const height = mount.clientHeight || containerRef.current?.clientHeight || 500;
+    const aspect = width / Math.max(1, height);
     const camera = new THREE.PerspectiveCamera(45, aspect, 0.05, 100);
     camera.position.set(0, 0.5, 3.8);
     cameraRef.current = camera;
@@ -153,10 +156,12 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
     // 3. Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(width, height);
     renderer.shadowMap.enabled = true;
-    container.innerHTML = '';
-    container.appendChild(renderer.domElement);
+    while (mount.firstChild) {
+      mount.removeChild(mount.firstChild);
+    }
+    mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     // 4. OrbitControls
@@ -242,9 +247,9 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
 
     // 10. Resize observer
     const handleResize = () => {
-      if (!container || !renderer || !camera) return;
-      const width = container.clientWidth;
-      const height = container.clientHeight;
+      if (!mount || !renderer || !camera) return;
+      const width = mount.clientWidth || containerRef.current?.clientWidth || 800;
+      const height = mount.clientHeight || containerRef.current?.clientHeight || 500;
       camera.aspect = width / Math.max(1, height);
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
@@ -260,8 +265,8 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
       }
       controls.dispose();
       renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      if (mount && mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
       }
     };
   }, []);
@@ -602,6 +607,12 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
 
       {/* 3D Canvas Viewport */}
       <div className="viewer-viewport-container" ref={containerRef}>
+        {/* Dedicated mount element for Three.js canvas - contains no React children */}
+        <div
+          ref={canvasMountRef}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }}
+        />
+
         {loading && (
           <div className="viewer-overlay-loading">
             <div className="loading-spinner mb-3" />

@@ -14,6 +14,7 @@ import { DamageMappingPage } from './pages/DamageMappingPage';
 import { TemporalMonitoringPage } from './pages/TemporalMonitoringPage';
 import { IntegratedDemoPage } from './pages/IntegratedDemoPage';
 import { MonitoringPage } from './pages/MonitoringPage';
+import type { MonitoringTab } from './pages/MonitoringPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { PipelinePlaceholderPage } from './pages/PipelinePlaceholderPage';
 
@@ -23,11 +24,23 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('overview');
   const [selectedSiteId, setSelectedSiteId] = useState<string | undefined>(undefined);
   const [selectedSurveyId, setSelectedSurveyId] = useState<string | undefined>(undefined);
+  const [monitoringTab, setMonitoringTab] = useState<MonitoringTab>('3d-model');
 
-  const handleNavigate = (tab: NavTab, surveyId?: string) => {
+  const handleNavigate = (
+    tab: NavTab,
+    surveyId?: string,
+    siteId?: string,
+    subTab?: MonitoringTab
+  ) => {
     setCurrentTab(tab);
     if (surveyId) {
       setSelectedSurveyId(surveyId);
+    }
+    if (siteId) {
+      setSelectedSiteId(siteId);
+    }
+    if (subTab) {
+      setMonitoringTab(subTab);
     }
   };
 
@@ -49,7 +62,9 @@ export const App: React.FC = () => {
       case 'monitoring':
         return (
           <MonitoringPage
+            initialSiteId={selectedSiteId}
             initialSurveyId={selectedSurveyId}
+            initialTab={monitoringTab}
             onNavigateToReports={() => setCurrentTab('reports')}
           />
         );

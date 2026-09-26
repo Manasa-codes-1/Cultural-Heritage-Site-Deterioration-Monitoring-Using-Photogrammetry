@@ -27,22 +27,34 @@ import type {
 } from '../types';
 import { ModelViewer3D } from '../components/viewer/ModelViewer3D';
 
+export type MonitoringTab = 'overview' | '3d-model' | 'materials' | 'deterioration' | 'changes';
+
 interface MonitoringPageProps {
+  initialSiteId?: string;
   initialSurveyId?: string;
+  initialTab?: MonitoringTab;
   onNavigateToReports?: () => void;
 }
 
 export const MonitoringPage: React.FC<MonitoringPageProps> = ({
+  initialSiteId,
   initialSurveyId,
+  initialTab,
   onNavigateToReports,
 }) => {
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
+  const [selectedSiteId, setSelectedSiteId] = useState<string>(initialSiteId || '');
   const [surveys, setSurveys] = useState<Survey[]>([]);
-  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('');
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>(initialSurveyId || '');
 
   // Active Tab: 1=Overview, 2=3D Model, 3=Materials, 4=Deterioration, 5=Change Analysis
-  const [activeTab, setActiveTab] = useState<'overview' | '3d-model' | 'materials' | 'deterioration' | 'changes'>('3d-model');
+  const [activeTab, setActiveTab] = useState<MonitoringTab>(initialTab || '3d-model');
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Backend Data
   const [reconstruction, setReconstruction] = useState<Reconstruction | null>(null);
@@ -160,7 +172,7 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
 
   // Model URL for 3D Viewer
   const modelUrl = reconstruction?.id
-    ? `/api/photogrammetry/reconstructions/${reconstruction.id}/download/pointcloud`
+    ? api.getReconstructionModelUrl(reconstruction.id, 'mesh')
     : '';
 
   return (
@@ -412,10 +424,13 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                 {modelUrl ? (
                   <ModelViewer3D
                     modelUrl={modelUrl}
-                    isDemo={reconstruction?.is_demo || true}
+                    isDemo={reconstruction?.is_demo ?? true}
+                    cameraPoses={reconstruction?.camera_poses || []}
+                    boundingBox={reconstruction?.bounding_box}
                     pointCount={reconstruction?.point_count || 16000}
                     vertexCount={reconstruction?.mesh_vertex_count || 1200}
                     triangleCount={reconstruction?.mesh_triangle_count || 2200}
+                    reprojectionError={reconstruction?.mean_reprojection_error}
                     showDamageMarkers={true}
                     damageMappings={mappingSummary?.mappings || []}
                     selectedMappingId={selectedMapping?.id}

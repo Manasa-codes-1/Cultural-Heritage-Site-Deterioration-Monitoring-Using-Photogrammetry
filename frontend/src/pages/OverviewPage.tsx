@@ -22,7 +22,7 @@ import type {
 import { api } from '../api/client';
 
 interface OverviewPageProps {
-  onNavigate: (tab: any, surveyId?: string) => void;
+  onNavigate: (tab: any, surveyId?: string, siteId?: string, subTab?: any) => void;
 }
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
@@ -173,7 +173,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
             </button>
 
             <button
-              onClick={() => onNavigate('monitoring', currentSurvey?.id)}
+              onClick={() => onNavigate('monitoring', currentSurvey?.id, selectedSiteId, '3d-model')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -309,7 +309,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
           {/* CARD 1: 3D RECONSTRUCTION */}
           <div
-            onClick={() => onNavigate('monitoring', currentSurvey?.id)}
+            onClick={() => onNavigate('monitoring', currentSurvey?.id, selectedSiteId, '3d-model')}
             style={{
               background: 'rgba(30, 41, 59, 0.5)',
               border: '1px solid rgba(51, 65, 85, 0.6)',
@@ -349,7 +349,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
 
           {/* CARD 2: MATERIAL ANALYSIS */}
           <div
-            onClick={() => onNavigate('monitoring', currentSurvey?.id)}
+            onClick={() => onNavigate('monitoring', currentSurvey?.id, selectedSiteId, 'materials')}
             style={{
               background: 'rgba(30, 41, 59, 0.5)',
               border: '1px solid rgba(51, 65, 85, 0.6)',
@@ -387,7 +387,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
 
           {/* CARD 3: DETERIORATION */}
           <div
-            onClick={() => onNavigate('monitoring', currentSurvey?.id)}
+            onClick={() => onNavigate('monitoring', currentSurvey?.id, selectedSiteId, 'deterioration')}
             style={{
               background: 'rgba(30, 41, 59, 0.5)',
               border: '1px solid rgba(51, 65, 85, 0.6)',
@@ -433,7 +433,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
 
           {/* CARD 4: TEMPORAL CHANGE */}
           <div
-            onClick={() => onNavigate('monitoring', currentSurvey?.id)}
+            onClick={() => onNavigate('monitoring', currentSurvey?.id, selectedSiteId, 'changes')}
             style={{
               background: 'rgba(30, 41, 59, 0.5)',
               border: '1px solid rgba(51, 65, 85, 0.6)',
