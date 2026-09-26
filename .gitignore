@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Machine Learning Weights & Checkpoints (Heavy binary files)
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.weights
+*.bin
+*.onnx
+checkpoints/
+**/checkpoints/
+
+# Environment
+.env
+.env.local
+*.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+frontend/build/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads & Outputs (keep directories, ignore heavy payloads)
+data/raw/*
+data/processed/*
+data/surveys/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/surveys/.gitkeep
+!data/demo/.gitkeep
+
+outputs/3d/*
+outputs/reports/*
+outputs/analysis/*
+!outputs/3d/.gitkeep
+!outputs/reports/.gitkeep
+!outputs/analysis/.gitkeep
+
+# IDEs & System
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+powershell.cmd
+*.log

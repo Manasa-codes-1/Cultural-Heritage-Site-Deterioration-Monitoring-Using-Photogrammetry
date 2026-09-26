@@ -1,0 +1,42 @@
+[
+  {
+    "id": "sandstone",
+    "name": "Sandstone / Stone",
+    "description": "Sedimentary sandstone or natural dressed stone masonry blocks.",
+    "color": "#d97706",
+    "enabled": true,
+    "is_default": true
+  },
+  {
+    "id": "granite",
+    "name": "Granite",
+    "description": "Coarse-grained igneous crystalline stone with high hardness and quartz content.",
+    "color": "#64748b",
+    "enabled": true,
+    "is_default": true
+  },
+  {
+    "id": "brick",
+    "name": "Fired Clay Brick",
+    "description": "Historic kiln-fired or sun-dried clay ceramic masonry units.",
+    "color": "#dc2626",
+    "enabled": true,
+    "is_default": true
+  },
+  {
+    "id": "lime_mortar",
+    "name": "Lime Mortar",
+    "description": "Non-hydraulic or hydraulic lime-sand joint bedding and pointing mortar.",
+    "color": "#cbd5e1",
+    "enabled": true,
+    "is_default": true
+  },
+  {
+    "id": "other",
+    "name": "Other / Unspecified Substrate",
+    "description": "Plaster, timber, metal fixings, or unidentified building substrate.",
+    "color": "#a855f7",
+    "enabled": true,
+    "is_default": true
+  }
+]

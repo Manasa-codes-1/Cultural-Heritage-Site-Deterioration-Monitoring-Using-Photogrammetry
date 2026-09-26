@@ -1,0 +1,47 @@
+[
+  {
+    "id": "crack",
+    "name": "Structural & Surface Cracking",
+    "description": "Linear fractures, fissures, or joint separations in stone masonry, brick, or mortar.",
+    "color": "#ef4444",
+    "enabled": true,
+    "is_default": true,
+    "severity_weight": 0.85
+  },
+  {
+    "id": "erosion",
+    "name": "Erosion / Material Loss",
+    "description": "Surface recession, granular disintegration, flaking, or powdering of masonry substrates.",
+    "color": "#f97316",
+    "enabled": true,
+    "is_default": true,
+    "severity_weight": 0.7
+  },
+  {
+    "id": "spalling",
+    "name": "Spalling / Flaking",
+    "description": "Detachment of surface fragments or flakes resulting from thermal cycles, salt crystallization, or mechanical stress.",
+    "color": "#eab308",
+    "enabled": true,
+    "is_default": true,
+    "severity_weight": 0.8
+  },
+  {
+    "id": "discoloration",
+    "name": "Discoloration / Staining",
+    "description": "Chromatic shifts, efflorescence salt deposits, atmospheric soot, or moisture capillary damp.",
+    "color": "#8b5cf6",
+    "enabled": true,
+    "is_default": true,
+    "severity_weight": 0.4
+  },
+  {
+    "id": "biological_growth",
+    "name": "Biological Growth",
+    "description": "Colonization by lichen, moss, algae, micro-vegetation, or microbial biofilm.",
+    "color": "#10b981",
+    "enabled": true,
+    "is_default": true,
+    "severity_weight": 0.5
+  }
+]

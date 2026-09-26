@@ -1,0 +1,14 @@
+__pycache__
+inputs
+outputs
+deepcrack_results
+
+checkpoints/*.pth
+checkpoints/DeepCrack_CT260_FT1
+data/CRKWH100
+data/Stone331
+data/CrackLS315
+data/merged
+data/Crack_Segmentation_Dataset
+data/CRACK500
+data/*.txt
