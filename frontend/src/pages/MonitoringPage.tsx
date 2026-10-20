@@ -18,6 +18,7 @@ import type {
   Site,
   Survey,
   Reconstruction,
+  PhotogrammetryAvailability,
   SurveyMaterialAnalysisSummary,
   SurveyDeteriorationAnalysisSummary,
   Survey3DMappingSummary,
@@ -69,13 +70,25 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
   const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
+  const [analyzingStatus, setAnalyzingStatus] = useState<string>('');
+  const [systemDiagnostics, setSystemDiagnostics] = useState<PhotogrammetryAvailability | null>(null);
 
-  // 1. Initial Load of Sites
+  // 3D reconstruction trigger states
+  const [reconstructing, setReconstructing] = useState<boolean>(false);
+  const [reconstructStage, setReconstructStage] = useState<string>('');
+  const [reconstructPercent, setReconstructPercent] = useState<number>(0);
+  const [reconstructError, setReconstructError] = useState<string | null>(null);
+
+  // 1. Initial Load of Sites & Diagnostics
   useEffect(() => {
     const initSites = async () => {
       try {
-        const sList = await api.getSites();
+        const [sList, diag] = await Promise.all([
+          api.getSites(),
+          api.getPhotogrammetryAvailability().catch(() => null),
+        ]);
         setSites(sList);
+        if (diag) setSystemDiagnostics(diag);
         if (sList.length > 0) {
           const defaultSite = sList.find((s) => s.name.includes('Demo')) || sList[0];
           setSelectedSiteId(defaultSite.id);
@@ -162,8 +175,77 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
   }, [selectedSurveyId]);
 
   const handleAnalyze = async () => {
+    if (!selectedSurveyId) return;
     setAnalyzing(true);
-    await loadMonitoringData();
+    try {
+      setAnalyzingStatus('Analyzing substrate materials...');
+      await api.analyzeSurveyMaterials(selectedSurveyId).catch((e) => console.warn('Material analysis warning:', e));
+
+      setAnalyzingStatus('Detecting deteriorations...');
+      await api.analyzeSurveyDeterioration(selectedSurveyId).catch((e) => console.warn('Deterioration analysis warning:', e));
+
+      if (reconstruction && reconstruction.status === 'completed') {
+        setAnalyzingStatus('Mapping 2D damage to 3D surface...');
+        await api.mapSurvey3D(selectedSurveyId, { force: true }).catch((e) => console.warn('Damage mapping warning:', e));
+      }
+
+      if (comparison) {
+        setAnalyzingStatus('Detecting multi-temporal changes...');
+        await api.runFullTemporalPipeline(comparison.id).catch((e) => console.warn('Temporal pipeline warning:', e));
+      }
+
+      setAnalyzingStatus('Refreshing workspace...');
+      await loadMonitoringData();
+    } catch (err) {
+      console.error('Analysis execution failed:', err);
+    } finally {
+      setAnalyzing(false);
+      setAnalyzingStatus('');
+    }
+  };
+
+  const handleTriggerReconstruction = async () => {
+    if (!selectedSurveyId) return;
+    setReconstructing(true);
+    setReconstructError(null);
+    setReconstructStage('QUEUED');
+    setReconstructPercent(5);
+
+    try {
+      const recon = await api.triggerReconstruction(selectedSurveyId, {
+        engine: 'auto',
+        dense: true,
+        generate_mesh: true,
+        force: true,
+      });
+      setReconstruction(recon);
+
+      const reconId = recon.id;
+      const pollTimer = window.setInterval(async () => {
+        try {
+          const status = await api.getReconstructionStatus(reconId);
+          setReconstruction(status);
+          setReconstructStage(status.current_stage || 'PROCESSING');
+          setReconstructPercent(status.progress_percent || 0);
+
+          if (status.status === 'completed') {
+            window.clearInterval(pollTimer);
+            setReconstructing(false);
+            await api.mapSurvey3D(selectedSurveyId, { force: true }).catch(() => null);
+            await loadMonitoringData();
+          } else if (status.status === 'failed') {
+            window.clearInterval(pollTimer);
+            setReconstructing(false);
+            setReconstructError(status.error_message || 'Reconstruction failed.');
+          }
+        } catch (e) {
+          console.warn('Reconstruction polling warning:', e);
+        }
+      }, 2000);
+    } catch (err: any) {
+      setReconstructing(false);
+      setReconstructError(err.message || 'Failed to trigger 3D reconstruction.');
+    }
   };
 
   const selectedSite = sites.find((s) => s.id === selectedSiteId);
@@ -218,7 +300,7 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
               }}
             >
               <RefreshCw size={14} className={analyzing ? 'animate-spin' : ''} />
-              <span>{analyzing ? 'Analyzing...' : 'Analyze Survey'}</span>
+              <span>{analyzing ? (analyzingStatus || 'Analyzing...') : 'Analyze Survey'}</span>
             </button>
 
             {onNavigateToReports && (
@@ -436,9 +518,67 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                     selectedMappingId={selectedMapping?.id}
                     onSelectDamagePoint={(item) => setSelectedMapping(item)}
                   />
+                ) : reconstructing || reconstruction?.status === 'running' || reconstruction?.status === 'pending' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '16px', padding: '24px' }}>
+                    <RefreshCw size={36} className="animate-spin text-amber-400" />
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9' }}>
+                        Generating 3D Photogrammetric Reconstruction...
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#f59e0b', marginTop: '6px', fontWeight: 600 }}>
+                        Stage: {reconstructStage || reconstruction?.current_stage || 'PROCESSING'} ({reconstructPercent || reconstruction?.progress_percent || 0}%)
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '8px' }}>
+                        Structure-from-Motion (SfM) → Point Cloud Processing → Mesh Generation
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: '14px' }}>
-                    Reconstructed 3D geometry not yet generated for this survey.
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '24px', textAlign: 'center', gap: '14px' }}>
+                    <Box size={42} className="text-slate-600" />
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9' }}>
+                        No 3D Surface Model Generated Yet
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '440px', marginTop: '6px' }}>
+                        {selectedSurvey && selectedSurvey.image_count === 0
+                          ? 'This survey contains 0 photographs. Upload survey images before generating 3D geometry.'
+                          : 'Reconstruct a 3D point cloud and surface mesh to map detected deteriorations in physical space.'}
+                      </div>
+                      {reconstructError && (
+                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                          {reconstructError}
+                        </div>
+                      )}
+                    </div>
+                    {(!selectedSurvey || selectedSurvey.image_count > 0) && (
+                      <button
+                        onClick={handleTriggerReconstruction}
+                        disabled={reconstructing}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 20px',
+                          borderRadius: '8px',
+                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+                        }}
+                      >
+                        <Box size={16} />
+                        <span>Generate 3D Surface Model</span>
+                      </button>
+                    )}
+                    {systemDiagnostics && !systemDiagnostics.colmap_available && (
+                      <div style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(51, 65, 85, 0.3)', padding: '4px 10px', borderRadius: '4px', maxWidth: '420px' }}>
+                        System Notice: COLMAP executable not detected on system PATH. System will use verified offline procedural SfM reconstruction engine.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -776,8 +916,8 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                 </div>
                 <div style={{ height: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <img
-                    src="/api/demo/mask/11111.png"
-                    alt="Sample Image"
+                    src="/api/demo/image/11111.jpg"
+                    alt="Raw Crack Image"
                     style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';

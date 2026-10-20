@@ -145,6 +145,17 @@ class DemoService:
         return None
 
     @classmethod
+    def get_image_path(cls, filename: str) -> Optional[Path]:
+        """Resolves path for a specific DeepCrack raw input image."""
+        img_dir, _ = cls.get_deepcrack_paths()
+        base_name = Path(filename).stem
+        for ext in [".jpg", ".png", ".jpeg"]:
+            cand = img_dir / f"{base_name}{ext}"
+            if cand.exists():
+                return cand
+        return None
+
+    @classmethod
     def reset_demo(cls, db: Session) -> bool:
         """Deletes demo site, surveys, and associated files for clean rerun."""
         site = db.query(Site).filter(Site.name == "Demo Heritage Structure").first()

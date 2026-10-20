@@ -48,6 +48,14 @@ def test_api_demo_mask_not_found(client: TestClient):
     assert resp.status_code == 404
 
 
+def test_api_demo_image_endpoint(client: TestClient):
+    """Test streaming of raw image via GET /api/demo/image/{filename}."""
+    resp = client.get("/api/demo/image/11111.jpg")
+    assert resp.status_code == 200
+    assert "image" in resp.headers["content-type"]
+    assert len(resp.content) > 0
+
+
 def test_api_run_integrated_demo_lifecycle(client: TestClient, db_session: Session):
     """
     Test full end-to-end integrated demo execution across Phases 1–7.

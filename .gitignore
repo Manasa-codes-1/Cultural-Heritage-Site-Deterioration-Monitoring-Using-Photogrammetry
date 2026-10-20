@@ -68,3 +68,4 @@ outputs/analysis/*
 Thumbs.db
 powershell.cmd
 *.log
+.tmp.driveupload/

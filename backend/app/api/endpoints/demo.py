@@ -62,6 +62,21 @@ def get_ground_truth_mask(filename: str):
     return FileResponse(path=str(mask_path), media_type="image/png", filename=mask_path.name)
 
 
+@router.get("/image/{filename}")
+def get_raw_demo_image(filename: str):
+    """
+    Streams a DeepCrack raw field image (.jpg/.png).
+    """
+    img_path = DemoService.get_image_path(filename)
+    if not img_path or not img_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Demo raw image '{filename}' not found.",
+        )
+    media_type = "image/png" if img_path.suffix.lower() == ".png" else "image/jpeg"
+    return FileResponse(path=str(img_path), media_type=media_type, filename=img_path.name)
+
+
 @router.post("/reset")
 def reset_demo(db: Session = Depends(get_db)):
     """
