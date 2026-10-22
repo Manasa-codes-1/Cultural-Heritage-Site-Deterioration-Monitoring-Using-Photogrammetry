@@ -593,6 +593,12 @@ class DemoService:
         )
         db.refresh(recon_t2)
 
+        # Also analyze substrate materials for survey T2
+        try:
+            mat_svc.analyze_survey(db, survey_t2.id)
+        except Exception as e:
+            logger.warning(f"Could not analyze T2 materials in demo: {e}")
+
         # Populate T2 with mapped deterioration to demonstrate all 4 temporal states:
         # a) PERSISTING: Same crack slightly translated
         # b) NEW: A new defect at T2
