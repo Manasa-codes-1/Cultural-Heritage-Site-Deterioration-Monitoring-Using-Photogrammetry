@@ -54,12 +54,14 @@ def list_available_models(models_dir: Optional[Path] = None) -> List[Dict[str, A
                             "architecture": cfg.get("architecture", "unknown"),
                             "device": cfg.get("device", "cpu"),
                             "classes": cfg.get("classes", []),
-                            "is_demo": False,
+                            "is_demo": bool(cfg.get("is_demo", False)),
                             "is_active": (item.name == "active"),
+                            "validation_status": cfg.get("validation_status", "VALIDATED"),
+                            "is_validated": bool(cfg.get("is_validated", True)),
                             "metrics": metrics_data,
                             "path": str(item),
                             "created_at": cfg.get("created_at"),
-                            "disclaimer": "Validated on specific dataset split. Does not guarantee field certainty."
+                            "disclaimer": cfg.get("provenance", {}).get("limitation", "Validated on specific dataset split. Does not guarantee field certainty.")
                         })
                     except Exception as e:
                         logger.warning(f"Failed to read model directory {item}: {e}")
@@ -69,20 +71,14 @@ def list_available_models(models_dir: Optional[Path] = None) -> List[Dict[str, A
 
 def get_material_classifier(model_id: Optional[str] = None) -> MaterialClassifier:
     """
-    Factory function returning the requested or optimal material classifier.
-    - If model_id is specified and exists, loads that model.
-    - If no model_id is specified, checks for 'models/material/active'.
-    - If no trained model is available or PyTorch cannot load it, falls back to DemoMaterialClassifier.
+    Factory function returning the requested material classifier.
+    - If model_id is specified and exists (e.g. 'active', 'heritage_v1'), loads that model.
+    - If model_id == 'demo' or None: defaults to DemoMaterialClassifier for consistent testing & demo baseline.
     """
     base_dir = DEFAULT_MODELS_DIR
 
-    # Check for specific or active model
-    candidate_dirs = []
     if model_id and model_id != "demo":
-        candidate_dirs.append(base_dir / model_id)
-    candidate_dirs.append(base_dir / "active")
-
-    for c_dir in candidate_dirs:
+        c_dir = base_dir / model_id
         if c_dir.exists() and (c_dir / "weights.pt").exists() and HAS_TORCH:
             try:
                 clf = PyTorchMaterialClassifier(model_dir=c_dir)
@@ -98,6 +94,7 @@ def get_material_classifier(model_id: Optional[str] = None) -> MaterialClassifie
 
 from app.ml.base_detector import DeteriorationDetector
 from app.ml.demo_detector import DemoDeteriorationDetector
+from app.ml.deepcrack_detector import DeepCrackDetector
 from app.ml.pytorch_detector import PyTorchDeteriorationDetector
 from app.ml.deterioration_validator import DeteriorationDatasetValidator
 from app.ml.deterioration_factory import get_deterioration_detector, list_deterioration_models, DEFAULT_DETERIORATION_MODELS_DIR
@@ -112,6 +109,7 @@ __all__ = [
     "DEFAULT_MODELS_DIR",
     "DeteriorationDetector",
     "DemoDeteriorationDetector",
+    "DeepCrackDetector",
     "PyTorchDeteriorationDetector",
     "DeteriorationDatasetValidator",
     "get_deterioration_detector",

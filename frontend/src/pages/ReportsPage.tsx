@@ -23,8 +23,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = () => {
         const sList = await api.getSites();
         setSites(sList);
         if (sList.length > 0) {
-          const defSite = sList.find((s) => s.name.includes('Demo')) || sList[0];
-          setSelectedSiteId(defSite.id);
+          const realSite = sList.find((s) => !s.name.toLowerCase().includes('demo') && !s.name.toLowerCase().includes('test'));
+          setSelectedSiteId(realSite?.id || sList[0].id);
         }
       } catch (err) {
         console.error('Failed to load sites:', err);
@@ -38,8 +38,11 @@ export const ReportsPage: React.FC<ReportsPageProps> = () => {
     const fetchSurveysAndData = async () => {
       try {
         const srvList = await api.getSurveys(selectedSiteId);
-        const curr = srvList.find((s) => s.survey_code?.includes('T2')) || srvList[srvList.length - 1];
-        setCurrentSurvey(curr || null);
+        const sorted = [...srvList].sort(
+          (a, b) => new Date(a.survey_date || '').getTime() - new Date(b.survey_date || '').getTime()
+        );
+        const curr = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+        setCurrentSurvey(curr);
 
         if (curr) {
           const [recon, mat, det, comps] = await Promise.all([
@@ -51,7 +54,17 @@ export const ReportsPage: React.FC<ReportsPageProps> = () => {
           setReconstruction(recon);
           setMaterialSummary(mat);
           setDeteriorationSummary(det);
-          setComparison(comps.length > 0 ? comps[0] : null);
+          // Only associate comparison if it actually matches current survey
+          const matchingComp = comps.find(
+            (c) => c.comparison_survey_id === curr.id || c.baseline_survey_id === curr.id
+          );
+          setComparison(matchingComp || null);
+
+        } else {
+          setReconstruction(null);
+          setMaterialSummary(null);
+          setDeteriorationSummary(null);
+          setComparison(null);
         }
       } catch (err) {
         console.error('Failed to load report data:', err);
@@ -59,6 +72,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = () => {
     };
     fetchSurveysAndData();
   }, [selectedSiteId]);
+
 
   const selectedSite = sites.find((s) => s.id === selectedSiteId);
 
@@ -102,12 +116,26 @@ export const ReportsPage: React.FC<ReportsPageProps> = () => {
               cursor: 'pointer',
             }}
           >
-            {sites.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
+            <optgroup label="Genuine Heritage Sites" style={{ background: '#0f172a', color: '#f59e0b', fontWeight: 700 }}>
+              {sites
+                .filter((s) => !s.name.toLowerCase().includes('demo') && !s.name.toLowerCase().includes('test'))
+                .map((s) => (
+                  <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#f8fafc', fontWeight: 500 }}>
+                    {s.name}
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label="Simulation / Demo Sites" style={{ background: '#0f172a', color: '#94a3b8', fontWeight: 700 }}>
+              {sites
+                .filter((s) => s.name.toLowerCase().includes('demo') || s.name.toLowerCase().includes('test'))
+                .map((s) => (
+                  <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#cbd5e1', fontWeight: 500 }}>
+                    {s.name} (Simulation Asset)
+                  </option>
+                ))}
+            </optgroup>
           </select>
+
 
           <button
             onClick={handlePrint}

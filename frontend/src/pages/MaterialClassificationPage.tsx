@@ -985,6 +985,11 @@ export const MaterialClassificationPage: React.FC<MaterialClassificationPageProp
                           Active
                         </span>
                       )}
+                      {(mod.validation_status === 'UNVALIDATED_PROTOTYPE' || mod.is_validated === false || mod.version?.includes('unvalidated')) && (
+                        <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-medium">
+                          Unvalidated Prototype
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-slate-400 mt-1">
                       Architecture: <span className="text-slate-300 font-mono">{mod.architecture}</span> | Mode:{' '}
@@ -992,6 +997,15 @@ export const MaterialClassificationPage: React.FC<MaterialClassificationPageProp
                         {mod.is_demo ? 'Demo Heuristic Simulation' : 'Deep Transfer Learning'}
                       </span>
                     </div>
+                    {(mod.validation_status === 'UNVALIDATED_PROTOTYPE' || mod.is_validated === false || mod.version?.includes('unvalidated')) && (
+                      <div className="mt-2 text-xs bg-amber-950/40 border border-amber-500/40 text-amber-200 p-2.5 rounded-lg flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="font-semibold">Research Safety Notice: </strong>
+                          Trained on exploratory synthetic texture crops. Not evaluated on authentic petrographic field samples (25.0% validation baseline). Do not present predictions as verified conservation findings.
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="text-xs text-slate-400">

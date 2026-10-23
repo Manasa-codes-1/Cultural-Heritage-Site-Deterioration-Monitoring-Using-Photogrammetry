@@ -325,7 +325,7 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
         geometry.center();
 
         const hasVertexColors = geometry.hasAttribute('color');
-        const hasFaces = geometry.index !== null || geometry.attributes.position.count % 3 === 0;
+        const hasFaces = geometry.index !== null;
 
         // 1. Shaded Mesh
         const meshMaterial = new THREE.MeshStandardMaterial({
@@ -362,8 +362,13 @@ export const ModelViewer3D: React.FC<ModelViewer3DProps> = ({
         modelGroup.add(wireMesh);
         modelGroup.add(points);
 
+        if (!hasFaces) {
+          setRenderMode('points');
+        }
+
         // Adjust visibility according to current renderMode
-        updateRenderModeVisibility(renderMode, mesh, wireMesh, points, hasFaces);
+        updateRenderModeVisibility(!hasFaces ? 'points' : renderMode, mesh, wireMesh, points, hasFaces);
+
 
         // Compute Bounding Box Helper if enabled
         geometry.computeBoundingBox();

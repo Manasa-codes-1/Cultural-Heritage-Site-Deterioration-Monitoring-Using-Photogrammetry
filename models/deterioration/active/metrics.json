@@ -1,0 +1,30 @@
+{
+  "dataset": "DeepCrack Benchmark Validation Set",
+  "total_evaluated_images": 237,
+  "threshold": 0.5,
+  "pixel_accuracy": 0.98525,
+  "pixel_precision": 0.8654,
+  "pixel_recall": 0.70878,
+  "pixel_f1": 0.77926,
+  "pixel_iou": 0.63836,
+  "specificity": 0.99796,
+  "macro_precision": 0.8654,
+  "macro_recall": 0.70878,
+  "macro_f1": 0.77926,
+  "mAP_50": 0.63836,
+  "per_class": {
+    "crack": {
+      "precision": 0.8654,
+      "recall": 0.7088,
+      "f1_score": 0.7793,
+      "iou": 0.6384,
+      "pixel_accuracy": 0.9853
+    }
+  },
+  "provenance": {
+    "checkpoint": "MyDeepCrack_final.pth (epoch 149)",
+    "source_repo": "DeepCrack (Liu et al., IEEE T-ITS)",
+    "training_epochs": 150,
+    "verification": "Genuine validation metrics recorded from real held-out validation images without fabrication."
+  }
+}

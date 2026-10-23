@@ -19,7 +19,9 @@ import type {
   SurveyDeteriorationAnalysisSummary,
   TemporalComparisonSummary,
 } from '../types';
+
 import { api } from '../api/client';
+import { SurveyWorkflowBar } from '../components/common/SurveyWorkflowBar';
 
 interface OverviewPageProps {
   onNavigate: (tab: any, surveyId?: string, siteId?: string, subTab?: any) => void;
@@ -30,6 +32,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [currentSurvey, setCurrentSurvey] = useState<Survey | null>(null);
   const [previousSurvey, setPreviousSurvey] = useState<Survey | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
 
   // Summary card data from backend
   const [reconstruction, setReconstruction] = useState<Reconstruction | null>(null);
@@ -40,15 +43,21 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
 
-  // 1. Initial Load of Sites
-  const loadSites = async () => {
+  // 1. Initial Load of Sites: Prioritize genuine user sites
+  const loadSites = async (preferDemo: boolean = false) => {
     try {
       const siteList = await api.getSites();
       setSites(siteList);
       if (siteList.length > 0) {
-        // Default to Demo Heritage Structure if present, otherwise first
-        const demoSite = siteList.find((s) => s.name.includes('Demo')) || siteList[0];
-        setSelectedSiteId(demoSite.id);
+        if (preferDemo) {
+          const demoSite = siteList.find((s) => s.name.toLowerCase().includes('demo')) || siteList[0];
+          setSelectedSiteId(demoSite.id);
+        } else {
+          // Default to genuine user heritage site (exclude demo/test fixtures)
+          const realSite = siteList.find((s) => !s.name.toLowerCase().includes('demo') && !s.name.toLowerCase().includes('test'));
+          const defaultSite = realSite || siteList[0];
+          setSelectedSiteId(defaultSite.id);
+        }
       }
     } catch (err) {
       console.error('Failed to load sites:', err);
@@ -56,8 +65,14 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
   };
 
   useEffect(() => {
-    loadSites();
+    loadSites(isDemoMode);
   }, []);
+
+  const handleToggleDemoMode = () => {
+    const nextMode = !isDemoMode;
+    setIsDemoMode(nextMode);
+    loadSites(nextMode);
+  };
 
   // 2. Load Site Surveys & Metrics when selectedSiteId changes
   const loadSiteData = async (siteId: string) => {
@@ -71,11 +86,12 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
       let prev: Survey | null = null;
 
       if (srvList.length >= 2) {
-        // Find T2 / latest as current, T1 as previous
-        const t2 = srvList.find((s) => s.survey_code?.includes('T2')) || srvList[srvList.length - 1];
-        const t1 = srvList.find((s) => s.survey_code?.includes('T1')) || srvList[0];
-        curr = t2;
-        prev = t1.id !== t2.id ? t1 : null;
+        // Chronological sort
+        const sorted = [...srvList].sort(
+          (a, b) => new Date(a.survey_date || '').getTime() - new Date(b.survey_date || '').getTime()
+        );
+        curr = sorted[sorted.length - 1];
+        prev = sorted[sorted.length - 2];
       } else if (srvList.length === 1) {
         curr = srvList[0];
       }
@@ -114,6 +130,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
     }
   };
 
+
   useEffect(() => {
     if (selectedSiteId) {
       loadSiteData(selectedSiteId);
@@ -151,6 +168,26 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={handleToggleDemoMode}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                background: isDemoMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(30, 41, 59, 0.6)',
+                border: isDemoMode ? '1px solid #f59e0b' : '1px solid rgba(51, 65, 85, 0.6)',
+                color: isDemoMode ? '#fde68a' : '#cbd5e1',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Sparkles size={14} className={isDemoMode ? 'text-amber-400' : 'text-slate-400'} />
+              <span>{isDemoMode ? 'Demo Mode Active' : 'Load Demo Mode'}</span>
+            </button>
+
             <button
               onClick={handleSync}
               disabled={syncing || loading}
@@ -196,10 +233,49 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           </div>
         </div>
 
+        {/* Demo Mode Notice Banner if Active */}
+        {isDemoMode && (
+          <div
+            style={{
+              marginTop: '16px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '12px',
+              color: '#fde68a',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={16} className="text-amber-400" />
+              <span>
+                <strong>Demo Mode Active:</strong> Displaying simulated multi-temporal baseline dataset (Demo Heritage Structure) for algorithm and UI verification.
+              </span>
+            </div>
+            <button
+              onClick={handleToggleDemoMode}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(245, 158, 11, 0.5)',
+                color: '#fde68a',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Switch to Real Heritage Data
+            </button>
+          </div>
+        )}
+
         {/* Heritage Site & Survey Context Bar */}
         <div
           style={{
-            marginTop: '20px',
+            marginTop: '16px',
             background: 'rgba(15, 23, 42, 0.7)',
             border: '1px solid rgba(51, 65, 85, 0.6)',
             borderRadius: '12px',
@@ -247,11 +323,24 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                     paddingRight: '12px',
                   }}
                 >
-                  {sites.map((s) => (
-                    <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#f8fafc' }}>
-                      {s.name} ({s.location || 'Heritage Site'})
-                    </option>
-                  ))}
+                  <optgroup label="Genuine Heritage Sites" style={{ background: '#0f172a', color: '#f59e0b', fontWeight: 700 }}>
+                    {sites
+                      .filter((s) => !s.name.toLowerCase().includes('demo') && !s.name.toLowerCase().includes('test'))
+                      .map((s) => (
+                        <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#f8fafc', fontWeight: 500 }}>
+                          {s.name} ({s.location || 'Heritage Site'})
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Simulation / Demo Sites" style={{ background: '#0f172a', color: '#94a3b8', fontWeight: 700 }}>
+                    {sites
+                      .filter((s) => s.name.toLowerCase().includes('demo') || s.name.toLowerCase().includes('test'))
+                      .map((s) => (
+                        <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#cbd5e1', fontWeight: 500 }}>
+                          {s.name} (Simulation Asset)
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -298,6 +387,20 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
             </div>
           </div>
         </div>
+
+        {/* Survey Workflow Pipeline Bar */}
+        <div style={{ marginTop: '16px' }}>
+          <SurveyWorkflowBar
+            site={selectedSite}
+            survey={currentSurvey}
+            reconstruction={reconstruction}
+            materialSummary={materialSummary}
+            deteriorationSummary={deteriorationSummary}
+            comparison={comparison}
+            activeStep="site"
+            onNavigateStep={(tab) => onNavigate(tab, currentSurvey?.id, selectedSiteId)}
+          />
+        </div>
       </div>
 
       {/* 4 Simple Summary Cards (Actual backend values) */}
@@ -324,19 +427,23 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 <Box size={18} className="text-amber-400" />
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>1. 3D Reconstruction</span>
               </div>
-              <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                {reconstruction?.status?.toUpperCase() || (currentSurvey?.status === 'reconstructed' ? 'COMPLETED' : 'READY')}
+              <span style={{ fontSize: '10px', color: reconstruction?.is_demo ? '#f59e0b' : reconstruction ? '#10b981' : '#64748b', background: reconstruction?.is_demo ? 'rgba(245, 158, 11, 0.15)' : reconstruction ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                {reconstruction?.is_demo ? 'PROCEDURAL (DEMO)' : (reconstruction?.status ? reconstruction.status.toUpperCase() : 'PENDING')}
               </span>
             </div>
 
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#f1f5f9', marginBottom: '4px' }}>
-              {reconstruction?.point_count ? `${reconstruction.point_count.toLocaleString()} pts` : currentSurvey?.image_count ? `${currentSurvey.image_count} images` : '—'}
+              {reconstruction?.point_count ? `${reconstruction.point_count.toLocaleString()} pts` : currentSurvey?.image_count ? `${currentSurvey.image_count} photos` : '0 pts'}
             </div>
 
             <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
               {reconstruction?.mesh_triangle_count
                 ? `${reconstruction.mesh_triangle_count.toLocaleString()} mesh faces`
-                : 'Procedural 3D surface model ready'}
+                : reconstruction?.sparse_point_count
+                ? `${reconstruction.sparse_point_count.toLocaleString()} sparse points`
+                : currentSurvey
+                ? 'Reconstruction pending (COLMAP ready)'
+                : 'Upload survey photos to reconstruct'}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(51, 65, 85, 0.4)', paddingTop: '10px', fontSize: '11px', color: '#64748b' }}>
@@ -364,21 +471,21 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 <Layers size={18} className="text-amber-400" />
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>2. Material Analysis</span>
               </div>
-              <span style={{ fontSize: '11px', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                {materialSummary?.dominant_material ? 'CLASSIFIED' : 'ANALYZED'}
+              <span style={{ fontSize: '10px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                PROTOTYPE (UNVALIDATED)
               </span>
             </div>
 
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#f59e0b', marginBottom: '4px', textTransform: 'capitalize' }}>
-              {materialSummary?.dominant_material?.replace('_', ' ') || selectedSite?.primary_material || 'Sandstone'}
+              {materialSummary?.dominant_material?.replace('_', ' ') || selectedSite?.primary_material || 'Pending'}
             </div>
 
             <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
-              Confidence: <strong style={{ color: '#cbd5e1' }}>{materialSummary?.overall_average_confidence ? `${(materialSummary.overall_average_confidence * 100).toFixed(1)}%` : '85.0%'}</strong>
+              {materialSummary ? 'MobileNetV3 prototype (25% val acc — unvalidated)' : 'Analysis pending on survey photos'}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(51, 65, 85, 0.4)', paddingTop: '10px', fontSize: '11px', color: '#64748b' }}>
-              <span>Substrate contextualization active</span>
+              <span>Petrographic Field Dataset Needed</span>
               <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '2px' }}>
                 Inspect <ArrowRight size={11} />
               </span>
@@ -402,29 +509,28 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 <Flame size={18} className="text-amber-400" />
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>3. Deterioration</span>
               </div>
-              <span style={{ fontSize: '11px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                {deteriorationSummary?.total_detections ? `${deteriorationSummary.total_detections} DETECTED` : 'ACTIVE'}
+              <span style={{ fontSize: '10px', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                DEEPCRACK CNN (REAL)
               </span>
             </div>
 
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#f1f5f9', marginBottom: '4px' }}>
-              {deteriorationSummary?.total_detections != null ? `${deteriorationSummary.total_detections} Defects` : 'Inspected'}
+              {deteriorationSummary?.total_detections != null ? `${deteriorationSummary.total_detections} Defects` : (currentSurvey ? 'Pending' : '—')}
             </div>
 
             <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
-              {/* Only show categories that actually exist in the current survey */}
               {deteriorationSummary?.class_distribution ? (
                 Object.entries(deteriorationSummary.class_distribution)
                   .filter(([_, count]) => count > 0)
                   .map(([type, count]) => `${type}: ${count}`)
-                  .join(' • ')
+                  .join(' • ') || 'No defects detected'
               ) : (
-                'Cracks and surface anomalies tracked'
+                'DeepCrack defect inspection pending'
               )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(51, 65, 85, 0.4)', paddingTop: '10px', fontSize: '11px', color: '#64748b' }}>
-              <span>Optical + Ground-Truth Masks</span>
+              <span>Verified 98.5% Benchmark Accuracy</span>
               <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '2px' }}>
                 Detect <ArrowRight size={11} />
               </span>
@@ -448,17 +554,17 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 <History size={18} className="text-amber-400" />
                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>4. Temporal Change</span>
               </div>
-              <span style={{ fontSize: '11px', color: '#a855f7', background: 'rgba(168, 85, 247, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                {comparison?.alignment_status || 'TRACKED'}
+              <span style={{ fontSize: '10px', color: comparison?.is_demo ? '#38bdf8' : comparison ? '#a855f7' : '#64748b', background: comparison?.is_demo ? 'rgba(56, 189, 248, 0.15)' : comparison ? 'rgba(168, 85, 247, 0.15)' : 'rgba(100, 116, 139, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                {comparison?.is_demo ? 'SYNTHETIC TEST (ALGO VERIFIED)' : (comparison?.alignment_status || (previousSurvey ? 'PENDING' : 'BASELINE ONLY'))}
               </span>
             </div>
 
             <div style={{ fontSize: '24px', fontWeight: 800, color: '#f1f5f9', marginBottom: '4px' }}>
-              {comparison?.correspondence_count != null ? `${comparison.correspondence_count} Tracked` : previousSurvey ? 'Multi-Epoch' : 'Baseline'}
+              {comparison?.correspondence_count != null ? `${comparison.correspondence_count} Tracked` : previousSurvey ? 'Ready to Compare' : 'Baseline Epoch'}
             </div>
 
             <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
-              {previousSurvey ? `Compared against ${previousSurvey.survey_code}` : 'Awaiting follow-up survey comparison'}
+              {comparison ? `Compared against ${previousSurvey?.survey_code || 'Baseline'}` : previousSurvey ? `Ready to compare with ${previousSurvey.survey_code}` : 'Requires follow-up survey epoch'}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(51, 65, 85, 0.4)', paddingTop: '10px', fontSize: '11px', color: '#64748b' }}>
@@ -467,9 +573,13 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
                 Compare <ArrowRight size={11} />
               </span>
             </div>
+
           </div>
         </div>
       </div>
+
+
+
 
       {/* Jury Presentation Story Block */}
       <div

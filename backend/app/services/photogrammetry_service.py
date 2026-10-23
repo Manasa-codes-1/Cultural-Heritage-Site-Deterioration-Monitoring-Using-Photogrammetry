@@ -301,14 +301,17 @@ class PhotogrammetryService:
         elif model_type == "log":
             target_path = recon.log_path
 
-        # Fallback if preferred dense or mesh is not present
-        if not target_path:
-            target_path = recon.mesh_path or recon.dense_point_cloud_path or recon.sparse_point_cloud_path
+        # Smart fallback if preferred asset is not set or missing on disk
+        if not target_path or not Path(target_path).exists():
+            for cand in [recon.mesh_path, recon.dense_point_cloud_path, recon.sparse_point_cloud_path]:
+                if cand and Path(cand).exists():
+                    target_path = cand
+                    break
 
         if not target_path or not Path(target_path).exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"3D asset file for type '{model_type}' does not exist on disk.",
+                detail=f"3D asset file for type '{model_type}' is not available on disk.",
             )
 
         path_obj = Path(target_path).resolve()

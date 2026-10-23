@@ -8,11 +8,12 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
-  CheckCircle2,
+  Sparkles,
   Crosshair,
   RefreshCw,
   Sliders,
 } from 'lucide-react';
+
 import { api } from '../api/client';
 import type {
   Site,
@@ -27,8 +28,10 @@ import type {
   TemporalChangeRecordItem,
 } from '../types';
 import { ModelViewer3D } from '../components/viewer/ModelViewer3D';
+import { SurveyWorkflowBar } from '../components/common/SurveyWorkflowBar';
 
 export type MonitoringTab = 'overview' | '3d-model' | 'materials' | 'deterioration' | 'changes';
+
 
 interface MonitoringPageProps {
   initialSiteId?: string;
@@ -79,26 +82,41 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
   const [reconstructPercent, setReconstructPercent] = useState<number>(0);
   const [reconstructError, setReconstructError] = useState<string | null>(null);
 
-  // 1. Initial Load of Sites & Diagnostics
-  useEffect(() => {
-    const initSites = async () => {
-      try {
-        const [sList, diag] = await Promise.all([
-          api.getSites(),
-          api.getPhotogrammetryAvailability().catch(() => null),
-        ]);
-        setSites(sList);
-        if (diag) setSystemDiagnostics(diag);
-        if (sList.length > 0) {
-          const defaultSite = sList.find((s) => s.name.includes('Demo')) || sList[0];
-          setSelectedSiteId(defaultSite.id);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+
+  // 1. Initial Load of Sites & Diagnostics: Default to genuine user sites
+  const loadSites = async (preferDemo: boolean = false) => {
+    try {
+      const [sList, diag] = await Promise.all([
+        api.getSites(),
+        api.getPhotogrammetryAvailability().catch(() => null),
+      ]);
+      setSites(sList);
+      if (diag) setSystemDiagnostics(diag);
+      if (sList.length > 0) {
+        if (preferDemo) {
+          const demoSite = sList.find((s) => s.name.toLowerCase().includes('demo')) || sList[0];
+          setSelectedSiteId(demoSite.id);
+        } else {
+          const realSite = sList.find((s) => !s.name.toLowerCase().includes('demo') && !s.name.toLowerCase().includes('test'));
+          const defaultSite = initialSiteId ? sList.find((s) => s.id === initialSiteId) : (realSite || sList[0]);
+          setSelectedSiteId(defaultSite ? defaultSite.id : sList[0].id);
         }
-      } catch (err) {
-        console.error('Failed to load sites:', err);
       }
-    };
-    initSites();
+    } catch (err) {
+      console.error('Failed to load sites:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadSites(isDemoMode);
   }, []);
+
+  const handleToggleDemoMode = () => {
+    const next = !isDemoMode;
+    setIsDemoMode(next);
+    loadSites(next);
+  };
 
   // 2. Load Surveys when Site changes
   useEffect(() => {
@@ -111,9 +129,11 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
           if (initialSurveyId && srvList.some((s) => s.id === initialSurveyId)) {
             setSelectedSurveyId(initialSurveyId);
           } else {
-            // Default to T2 (or latest)
-            const t2 = srvList.find((s) => s.survey_code?.includes('T2')) || srvList[srvList.length - 1];
-            setSelectedSurveyId(t2.id);
+            // Default to latest chronological survey
+            const sorted = [...srvList].sort(
+              (a, b) => new Date(a.survey_date || '').getTime() - new Date(b.survey_date || '').getTime()
+            );
+            setSelectedSurveyId(sorted[sorted.length - 1].id);
           }
         } else {
           setSelectedSurveyId('');
@@ -124,6 +144,7 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
     };
     fetchSurveys();
   }, [selectedSiteId, initialSurveyId]);
+
 
   // 3. Load All Monitoring Intelligence for Selected Survey
   const loadMonitoringData = async () => {
@@ -267,9 +288,13 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
               <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
                 Integrated Analysis Workspace
               </span>
-              {reconstruction?.is_demo && (
-                <span style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(51, 65, 85, 0.5)', padding: '2px 8px', borderRadius: '4px' }}>
-                  Demo / Procedural Facade Geometry
+              {reconstruction?.is_demo ? (
+                <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '2px 8px', borderRadius: '4px' }}>
+                  Procedural Geometry (COLMAP SfM Ready — Multi-View Overlap Set Pending)
+                </span>
+              ) : (
+                <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '4px' }}>
+                  COLMAP Genuine Photogrammetric Reconstruction
                 </span>
               )}
             </div>
@@ -282,6 +307,26 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={handleToggleDemoMode}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                background: isDemoMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(30, 41, 59, 0.6)',
+                border: isDemoMode ? '1px solid #f59e0b' : '1px solid rgba(51, 65, 85, 0.6)',
+                color: isDemoMode ? '#fde68a' : '#cbd5e1',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Sparkles size={14} className={isDemoMode ? 'text-amber-400' : 'text-slate-400'} />
+              <span>{isDemoMode ? 'Demo Mode Active' : 'Load Demo Mode'}</span>
+            </button>
+
             <button
               onClick={handleAnalyze}
               disabled={analyzing || loading}
@@ -327,6 +372,45 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
           </div>
         </div>
 
+        {/* Demo Mode Notice Banner if Active */}
+        {isDemoMode && (
+          <div
+            style={{
+              marginTop: '16px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '12px',
+              color: '#fde68a',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={16} className="text-amber-400" />
+              <span>
+                <strong>Demo Walkthrough Mode:</strong> Displaying simulated multi-temporal baseline dataset (Demo Heritage Structure) for evaluation and workflow preview.
+              </span>
+            </div>
+            <button
+              onClick={handleToggleDemoMode}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(245, 158, 11, 0.5)',
+                color: '#fde68a',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Switch to Real Heritage Data
+            </button>
+          </div>
+        )}
+
         {/* Site & Survey Context Selector Strip */}
         <div
           style={{
@@ -361,11 +445,24 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                   cursor: 'pointer',
                 }}
               >
-                {sites.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
+                <optgroup label="Genuine Heritage Sites" style={{ background: '#0f172a', color: '#f59e0b', fontWeight: 700 }}>
+                  {sites
+                    .filter((s) => !s.name.toLowerCase().includes('demo') && !s.name.toLowerCase().includes('test'))
+                    .map((s) => (
+                      <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#f8fafc', fontWeight: 500 }}>
+                        {s.name} ({s.location || 'Heritage Site'})
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Simulation / Demo Sites" style={{ background: '#0f172a', color: '#94a3b8', fontWeight: 700 }}>
+                  {sites
+                    .filter((s) => s.name.toLowerCase().includes('demo') || s.name.toLowerCase().includes('test'))
+                    .map((s) => (
+                      <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#cbd5e1', fontWeight: 500 }}>
+                        {s.name} (Simulation Asset)
+                      </option>
+                    ))}
+                </optgroup>
               </select>
             </div>
 
@@ -399,36 +496,32 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
           {/* Quick status counters */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#cbd5e1' }}>
             <span>Points: <strong style={{ color: '#f1f5f9' }}>{reconstruction?.point_count ? reconstruction.point_count.toLocaleString() : '—'}</strong></span>
-            <span>Material: <strong style={{ color: '#f59e0b', textTransform: 'capitalize' }}>{materialSummary?.dominant_material?.replace('_', ' ') || 'Sandstone'}</strong></span>
+            <span>Material: <strong style={{ color: '#f59e0b', textTransform: 'capitalize' }}>{materialSummary?.dominant_material?.replace('_', ' ') || selectedSite?.primary_material || 'Pending'}</strong></span>
             <span>Defects: <strong style={{ color: '#ef4444' }}>{mappingSummary?.total_eligible_detections || deteriorationSummary?.total_detections || 0}</strong></span>
             <span>Temporal: <strong style={{ color: '#38bdf8' }}>{comparison ? `${changeRecords.length} Changes` : 'Baseline'}</strong></span>
           </div>
         </div>
 
-        {/* Visual Workflow Progress Bar */}
-        <div style={{ marginTop: '12px', background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(51, 65, 85, 0.4)', borderRadius: '8px', padding: '10px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', overflowX: 'auto', gap: '6px' }}>
-            {[
-              { label: 'Images', done: true },
-              { label: 'Quality & Readiness', done: true },
-              { label: '3D Reconstruction', done: !!reconstruction },
-              { label: 'Material Analysis', done: !!materialSummary },
-              { label: 'Deterioration Detection', done: !!deteriorationSummary },
-              { label: '3D Damage Mapping', done: !!mappingSummary && mappingSummary.mapped_detections > 0 },
-              { label: 'Temporal Comparison', done: !!comparison },
-              { label: 'Monitoring Result', done: true },
-            ].map((st, i, arr) => (
-              <React.Fragment key={st.label}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 600, color: st.done ? '#cbd5e1' : '#64748b', whiteSpace: 'nowrap' }}>
-                  <CheckCircle2 size={12} style={{ color: st.done ? '#10b981' : '#475569' }} />
-                  <span>{st.label}</span>
-                </div>
-                {i < arr.length - 1 && <span style={{ color: '#334155', fontSize: '11px' }}>→</span>}
-              </React.Fragment>
-            ))}
-          </div>
+        {/* Survey Workflow Pipeline Bar */}
+        <div style={{ marginTop: '14px' }}>
+          <SurveyWorkflowBar
+            site={selectedSite}
+            survey={selectedSurvey}
+            reconstruction={reconstruction}
+            materialSummary={materialSummary}
+            deteriorationSummary={deteriorationSummary}
+            mappingSummary={mappingSummary}
+            comparison={comparison}
+            activeStep="reconstruction"
+            onNavigateStep={(tab) => {
+              if (tab === 'reports' && onNavigateToReports) {
+                onNavigateToReports();
+              }
+            }}
+          />
         </div>
       </div>
+
 
       {/* 5 Simple Sections/Tabs */}
       <div style={{ marginBottom: '18px', borderBottom: '1px solid rgba(51, 65, 85, 0.6)' }}>
@@ -509,9 +602,9 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                     isDemo={reconstruction?.is_demo ?? true}
                     cameraPoses={reconstruction?.camera_poses || []}
                     boundingBox={reconstruction?.bounding_box}
-                    pointCount={reconstruction?.point_count || 16000}
-                    vertexCount={reconstruction?.mesh_vertex_count || 1200}
-                    triangleCount={reconstruction?.mesh_triangle_count || 2200}
+                    pointCount={reconstruction?.point_count ?? 0}
+                    vertexCount={reconstruction?.mesh_vertex_count ?? 0}
+                    triangleCount={reconstruction?.mesh_triangle_count ?? 0}
                     reprojectionError={reconstruction?.mean_reprojection_error}
                     showDamageMarkers={true}
                     damageMappings={mappingSummary?.mappings || []}
@@ -546,7 +639,7 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                           : 'Reconstruct a 3D point cloud and surface mesh to map detected deteriorations in physical space.'}
                       </div>
                       {reconstructError && (
-                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '10px', background: 'rgba(239, 68, 68, 0.1)', padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.3)', maxWidth: '480px', textAlign: 'left' }}>
                           {reconstructError}
                         </div>
                       )}
@@ -574,14 +667,17 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                         <span>Generate 3D Surface Model</span>
                       </button>
                     )}
-                    {systemDiagnostics && !systemDiagnostics.colmap_available && (
-                      <div style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(51, 65, 85, 0.3)', padding: '4px 10px', borderRadius: '4px', maxWidth: '420px' }}>
-                        System Notice: COLMAP executable not detected on system PATH. System will use verified offline procedural SfM reconstruction engine.
+                    <div style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(51, 65, 85, 0.3)', padding: '6px 12px', borderRadius: '6px', maxWidth: '480px', lineHeight: 1.5, textAlign: 'left' }}>
+                      <strong style={{ color: '#cbd5e1' }}>SfM Engine Status:</strong> {systemDiagnostics?.colmap_available ? `COLMAP ${systemDiagnostics.colmap_version || '3.9'} Active (${systemDiagnostics.gpu_info || 'CPU Mode'})` : 'COLMAP Offline'}
+                      <div style={{ marginTop: '4px' }}>
+                        Structure-from-Motion requires 15–30 overlapping photos (60–80% overlap between adjacent views with baseline angle variations). Close-up photos with zero baseline cannot be triangulated.
                       </div>
-                    )}
+                    </div>
                   </div>
+
                 )}
               </div>
+
 
               {/* Simple Legend Bar */}
               <div
@@ -802,9 +898,21 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
       {activeTab === 'materials' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(51, 65, 85, 0.6)', borderRadius: '10px', padding: '20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: '0 0 16px' }}>
-              Substrate Material Distribution
-            </h3>
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              fontSize: '12px',
+              lineHeight: '1.5',
+              color: '#fef3c7'
+            }}>
+              <strong style={{ color: '#f59e0b', display: 'block', marginBottom: '2px' }}>
+                PROTOTYPE ARCHITECTURAL MODEL — UNVALIDATED
+              </strong>
+              Substrate classifier is an experimental MobileNetV3 prototype trained on synthetic color-transformed texture crops. Not evaluated on authentic petrographic field samples (25.0% validation baseline). Do not present as verified conservation findings.
+            </div>
 
             <div style={{ marginBottom: '16px' }}>
               <div style={{ fontSize: '12px', color: '#94a3b8' }}>Dominant Material Class</div>
@@ -858,6 +966,21 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
       {/* TAB 4: DETERIORATION & GROUND TRUTH */}
       {activeTab === 'deterioration' && (
         <div>
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            marginBottom: '16px',
+            fontSize: '12px',
+            lineHeight: '1.5',
+            color: '#d1fae5'
+          }}>
+            <strong style={{ color: '#10b981', display: 'block', marginBottom: '2px' }}>
+              REAL MODEL: DEEPCRACK FEATURE-FUSED CNN (BENCHMARK VALIDATED)
+            </strong>
+            PyTorch deep convolutional neural network for crack and fracture segmentation. Provenance verified against held-out benchmark (98.53% pixel accuracy, 70.88% sensitivity, 86.54% precision, 77.93% F1, 63.84% IoU). Defect specialization: fractures only.
+          </div>
           {/* Visual Summary: Detected Deterioration (Only categories that actually exist!) */}
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(51, 65, 85, 0.6)', borderRadius: '10px', padding: '16px 20px', marginBottom: '20px' }}>
             <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px' }}>
@@ -946,6 +1069,21 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
       {/* TAB 5: CHANGE ANALYSIS (TEMPORAL MONITORING) */}
       {activeTab === 'changes' && (
         <div>
+          <div style={{
+            background: 'rgba(56, 189, 248, 0.1)',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            marginBottom: '16px',
+            fontSize: '12px',
+            lineHeight: '1.5',
+            color: '#e0f2fe'
+          }}>
+            <strong style={{ color: '#38bdf8', display: 'block', marginBottom: '2px' }}>
+              TEMPORAL PIPELINE: ALGORITHMIC IMPLEMENTATION VERIFIED (FIELD REPEAT SURVEY PENDING)
+            </strong>
+            Rigid ICP point-cloud co-registration, Hausdorff distance calculation, and spatial damage persistence tracking are mathematically implemented and verified using test epochs. Full multi-year monument validation is pending field capture of repeated temporal surveys.
+          </div>
           {/* T1 → T2 Presentation */}
           <div
             style={{

@@ -1,0 +1,13 @@
+{
+  "model_id": "deepcrack",
+  "name": "DeepCrack CNN Feature-Fused Segmenter",
+  "version": "v1.0-benchmark",
+  "architecture": "DeepCrack (Multi-Scale Feature Fusion)",
+  "framework": "PyTorch",
+  "classes": ["crack"],
+  "input_resolution": [512, 512],
+  "default_threshold": 0.5,
+  "is_demo": false,
+  "description": "Multi-scale deep convolutional neural network for automated crack segmentation on masonry and concrete heritage surfaces.",
+  "disclaimer": "Validated on DeepCrack held-out dataset. Specializes in crack segmentation; other damage classes require separate annotations."
+}

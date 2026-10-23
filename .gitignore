@@ -23,6 +23,12 @@ htmlcov/
 checkpoints/
 **/checkpoints/
 
+# Tools & External Binaries (COLMAP, etc.)
+tools/
+
+# Heavy Datasets
+data/datasets/
+
 # Environment
 .env
 .env.local

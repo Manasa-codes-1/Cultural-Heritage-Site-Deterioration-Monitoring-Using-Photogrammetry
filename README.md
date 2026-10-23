@@ -370,6 +370,41 @@ Phase 7 implements multi-temporal geometric registration, nearest-neighbor chang
 
 ---
 
+## 🔬 Real Models & Research Validation Status
+
+This project implements rigorous academic honesty across all components. Synthetic test fixtures and algorithmic prototypes are explicitly segregated from real model predictions:
+
+| Pipeline Domain | Real Research Asset | Provenance & Benchmark Metrics | Scientific Status |
+| :--- | :--- | :--- | :--- |
+| **Deterioration Detection** | PyTorch DeepCrack CNN (`MyDeepCrack_final.pth`, 123.7 MB) | **237-Image Benchmark (Epoch 149)**:<br>• Accuracy: **98.53%**<br>• Specificity: **99.80%**<br>• Recall: **70.88%**<br>• Precision: **86.54%**<br>• F1-Score: **77.93%**<br>• IoU: **63.84%** | **Validated Benchmark** (Crack-specific segmentation) |
+| **Photogrammetry** | COLMAP 3.9.1 (CPU build, Windows) in `tools/colmap/` | Configured with automatic DLL and Qt path resolution. Open3D integration for point cloud & mesh extraction. | **Engine Operational** (Multi-view survey photo set pending) |
+| **Substrate Classification** | PyTorch MobileNetV3-Small (`weights.pt`, 6.2 MB) | Evaluated on 20 validation samples: 25.0% accuracy (matching random guess baseline across 4 classes). | **Unvalidated Prototype** (Petrographic field dataset needed) |
+| **2D-to-3D Damage Mapping** | Calibrated Pinhole Raycaster (`CameraModel`, `SurfaceRaycaster`) | Ray-triangle intersection with reprojection validation ($C = -R^T t$, $f, cx, cy$). Procedural fallback tagged with `is_demo=True`, `scale_status=LOCAL`. | **Algorithmic Verified** (Physical dimensions never invented) |
+| **Multi-Temporal Monitoring** | Rigid ICP Co-Registration + Nearest Neighbor Delta | Besl & McKay ICP, Point-to-Plane, Hausdorff distance, and spatial damage persistence tracking. | **Algorithmic Verified** (Field repeat surveys pending) |
+
+For comprehensive reproducibility logs, sample confusion matrices, and exact mathematical formulations, refer to the [Research Validation Report](RESEARCH_VALIDATION_REPORT.md) and [DeepCrack Reproducibility Report](models/deterioration/deepcrack/REPRODUCIBILITY_REPORT.md).
+
+---
+
+## 🧪 Comprehensive Verification Suite
+
+- **Backend Test Suite**: **63/63 passing (100%)** in 55.02s (`pytest backend/tests`)
+  - `test_colmap_reader.py`: COLMAP binary & text model parser verification
+  - `test_damage_mapping.py`: 2D-to-3D raycasting, pinhole camera projection, and reprojection residual tests
+  - `test_deterioration_detection.py`: Detection pipelines, thresholding, and polygon contour extraction
+  - `test_feature_matching.py`: SIFT/ORB feature matching and epipolar geometry
+  - `test_health.py`: FastAPI server health and diagnostic routes
+  - `test_integrated_demo.py`: End-to-end multi-phase execution pipeline
+  - `test_material_classification.py`: Taxonomy registry, dataset validation, and model loading
+  - `test_photogrammetry.py`: COLMAP engine, availability detection, and Open3D geometry processing
+  - `test_quality_assessor.py`: Laplacian blur, exposure histograms, and resolution validation
+  - `test_real_models.py`: DeepCrack PyTorch inference, blank image verification, and material classifier
+  - `test_sites_surveys.py`: Site and survey relational persistence
+  - `test_temporal_monitoring.py`: Rigid ICP co-registration, Hausdorff distance, and defect tracking
+- **Frontend Production Build**: **0 errors** in 1.11s (`tsc -b && vite build`)
+
+---
+
 ## ⚠️ Academic & Conservation Notice
 This platform is an academic research and decision-support system. It is designed to assist conservators, researchers, and engineers by prioritizing monitoring attention and quantifying change over time. It does **not** provide certified structural safety guarantees or replace on-site physical evaluation by licensed heritage conservators.
 

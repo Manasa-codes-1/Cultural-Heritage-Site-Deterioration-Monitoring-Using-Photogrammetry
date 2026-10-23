@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 
 from app.ml.base_detector import DeteriorationDetector
 from app.ml.demo_detector import DemoDeteriorationDetector
+from app.ml.deepcrack_detector import DeepCrackDetector
 from app.ml.pytorch_detector import PyTorchDeteriorationDetector, HAS_TORCH
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ DEFAULT_DETERIORATION_MODELS_DIR = Path("models/deterioration")
 def list_deterioration_models(models_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
     """
     Scans models directory for packaged deterioration detectors and returns metadata.
-    Always includes DemoDeteriorationDetector for complete research transparency.
+    Always includes DemoDeteriorationDetector and DeepCrack CNN for complete research transparency.
     """
     base_dir = Path(models_dir) if models_dir else DEFAULT_DETERIORATION_MODELS_DIR
     models_list = []
@@ -27,6 +28,10 @@ def list_deterioration_models(models_dir: Optional[Path] = None) -> List[Dict[st
     # 1. Built-in Demo Detector
     demo_inst = DemoDeteriorationDetector()
     models_list.append(demo_inst.get_model_info())
+
+    # 2. Real DeepCrack Segmenter
+    deepcrack_inst = DeepCrackDetector()
+    models_list.append(deepcrack_inst.get_model_info())
 
     # 2. Packaged PyTorch detectors
     if base_dir.exists():
@@ -65,18 +70,19 @@ def list_deterioration_models(models_dir: Optional[Path] = None) -> List[Dict[st
 def get_deterioration_detector(model_id: Optional[str] = None) -> DeteriorationDetector:
     """
     Factory function returning the active or requested deterioration detector.
-    - If model_id is specified and exists on disk, loads that model.
-    - If no model_id is specified, checks for 'models/deterioration/active'.
-    - If no trained model exists or PyTorch is unavailable, falls back cleanly to DemoDeteriorationDetector.
+    - If model_id in ['deepcrack', 'DeepCrack']: loads real DeepCrackDetector.
+    - If model_id is specified and exists under models/deterioration/, loads that model.
+    - If model_id == 'demo' or None: defaults to DemoDeteriorationDetector for consistent baseline demo & testing.
     """
+    if model_id in ["deepcrack", "DeepCrack"]:
+        det = DeepCrackDetector()
+        if det.is_available():
+            logger.info("Using real DeepCrack CNN detector as requested defect model.")
+            return det
+
     base_dir = DEFAULT_DETERIORATION_MODELS_DIR
-
-    candidate_dirs = []
     if model_id and model_id != "demo":
-        candidate_dirs.append(base_dir / model_id)
-    candidate_dirs.append(base_dir / "active")
-
-    for c_dir in candidate_dirs:
+        c_dir = base_dir / model_id
         if c_dir.exists() and (c_dir / "weights.pt").exists() and HAS_TORCH:
             try:
                 det = PyTorchDeteriorationDetector(model_dir=c_dir)
@@ -86,5 +92,5 @@ def get_deterioration_detector(model_id: Optional[str] = None) -> DeteriorationD
             except Exception as e:
                 logger.warning(f"Could not load PyTorch detector from {c_dir}: {e}")
 
-    logger.info("Using DemoDeteriorationDetector (heuristic demo mode).")
+    logger.info("Using DemoDeteriorationDetector (baseline demo mode).")
     return DemoDeteriorationDetector()

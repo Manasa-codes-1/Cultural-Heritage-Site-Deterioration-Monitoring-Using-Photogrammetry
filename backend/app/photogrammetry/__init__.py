@@ -10,23 +10,26 @@ from app.photogrammetry.mock_engine import MockPhotogrammetryEngine
 def get_photogrammetry_engine(engine_name: str = "auto") -> PhotogrammetryEngine:
     """
     Factory function returning the appropriate photogrammetry engine.
-    - 'auto': Attempts to use COLMAP if binary exists and is functional; falls back to Mock engine.
-    - 'colmap': Forces COLMAP engine.
-    - 'mock': Uses synthetic Mock engine for safe offline/CPU testing.
+    - 'auto': Uses COLMAP photogrammetry engine if installed and functional; raises RuntimeError if unavailable.
+    - 'colmap': Forces COLMAP engine (raises RuntimeError if unavailable).
+    - 'mock': Explicitly uses synthetic Mock engine for safe offline/CPU automated testing.
     """
     colmap = ColmapEngine()
-    if engine_name == "colmap":
-        return colmap
+    if engine_name in ("auto", "colmap"):
+        avail = colmap.check_availability()
+        if avail["available"]:
+            return colmap
+        raise RuntimeError(
+            "COLMAP photogrammetry engine is not installed or accessible on this system. "
+            f"Details: {avail.get('details')}. "
+            "Please verify COLMAP under tools/colmap or specify engine='mock' explicitly for testing."
+        )
 
     if engine_name == "mock":
         return MockPhotogrammetryEngine()
 
-    # 'auto' mode:
-    avail = colmap.check_availability()
-    if avail["available"]:
-        return colmap
+    raise ValueError(f"Unknown photogrammetry engine '{engine_name}'. Supported: 'auto', 'colmap', 'mock'.")
 
-    return MockPhotogrammetryEngine()
 
 
 def check_photogrammetry_system() -> Dict[str, Any]:

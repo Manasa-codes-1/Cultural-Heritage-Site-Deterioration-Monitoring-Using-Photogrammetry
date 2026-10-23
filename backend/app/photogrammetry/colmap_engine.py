@@ -13,6 +13,7 @@ from typing import Dict, Any, List, Optional, Callable
 
 from app.core.config import settings
 from app.photogrammetry.base import PhotogrammetryEngine
+from app.photogrammetry.colmap_reader import parse_colmap_model
 
 
 class ColmapEngine(PhotogrammetryEngine):
@@ -34,6 +35,35 @@ class ColmapEngine(PhotogrammetryEngine):
     def name(self) -> str:
         return "colmap"
 
+    def _resolve_binary_and_env(self) -> Tuple[Optional[str], Dict[str, str]]:
+        env = os.environ.copy()
+
+        # 1. System PATH or explicitly specified binary
+        colmap_exe = shutil.which(self.binary)
+        if not colmap_exe and os.path.exists(self.binary):
+            colmap_exe = self.binary
+        if colmap_exe:
+            return colmap_exe, env
+
+        default_binary = getattr(settings, "COLMAP_PATH", "colmap")
+        if self.binary and self.binary not in ("colmap", default_binary):
+            return None, env
+
+        # 2. Check workspace tools/colmap installation
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        candidates = [
+            project_root / "tools" / "colmap" / "COLMAP-3.9.1-windows-no-cuda",
+            Path("C:/tools/colmap/COLMAP-3.9.1-windows-no-cuda"),
+        ]
+        for cand in candidates:
+            exe = cand / "bin" / "colmap.exe"
+            if exe.exists():
+                env["PATH"] = str(cand / "lib") + os.pathsep + env.get("PATH", "")
+                env["QT_PLUGIN_PATH"] = str(cand / "lib" / "plugins")
+                return str(exe), env
+
+        return None, env
+
     def check_availability(self) -> Dict[str, Any]:
         """Verify whether colmap binary is executable and detect CUDA support."""
         result = {
@@ -44,23 +74,20 @@ class ColmapEngine(PhotogrammetryEngine):
             "details": "COLMAP executable not found in system PATH or configuration.",
         }
 
-        # Check binary existence
-        colmap_exe = shutil.which(self.binary)
-        if not colmap_exe and os.path.exists(self.binary):
-            colmap_exe = self.binary
-
+        colmap_exe, env = self._resolve_binary_and_env()
         if not colmap_exe:
             return result
 
         try:
             # Query COLMAP help/version
             proc = subprocess.run(
-                [colmap_exe, "-h"],
+                [colmap_exe, "help"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=5,
                 check=False,
+                env=env,
             )
             output = proc.stdout + proc.stderr
             result["available"] = True
@@ -97,6 +124,8 @@ class ColmapEngine(PhotogrammetryEngine):
         if progress_cb:
             progress_cb(stage_name, progress_pct, f"Executing COLMAP {stage_name}...")
 
+        _, env = self._resolve_binary_and_env()
+
         with open(log_file, "a", encoding="utf-8") as lf:
             lf.write(f"\n--- [COLMAP STAGE: {stage_name}] ---\n")
             lf.write(f"Command: {' '.join(cmd)}\n")
@@ -110,6 +139,7 @@ class ColmapEngine(PhotogrammetryEngine):
                     text=True,
                     bufsize=1,
                     universal_newlines=True,
+                    env=env,
                 )
 
                 if proc.stdout:
@@ -127,6 +157,43 @@ class ColmapEngine(PhotogrammetryEngine):
             except Exception as e:
                 lf.write(f"Exception during {stage_name}: {str(e)}\n")
                 return False
+
+    def _diagnose_mapper_failure(self, log_file: Path) -> str:
+        """Inspects COLMAP log to provide actionable diagnostic feedback to the surveyor."""
+        if not log_file.exists():
+            return (
+                "COLMAP Sparse Reconstruction failed: Unable to register camera poses. "
+                "Ensure survey contains overlapping photographs with 60-80% visual overlap."
+            )
+
+        try:
+            content = log_file.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            content = ""
+
+        if "No images with matches found in the database" in content or "connected 0" in content:
+            return (
+                "COLMAP Reconstruction Failed: Zero matching image pairs found across survey images. "
+                "Photogrammetry requires overlapping photographs (minimum 60-80% overlap between adjacent views). "
+                "The uploaded images do not share sufficient visual features or were taken from unrelated viewpoints."
+            )
+        if "Could not register any initial image pair" in content or "No good initial image pair found" in content:
+            return (
+                "COLMAP Reconstruction Failed: Could not find a valid initial image pair with sufficient parallax. "
+                "Photogrammetry requires camera baseline variation (photos must be taken from slightly different positions "
+                "and angles around the structure, not from the exact same standing spot or zoom level)."
+            )
+        if "failed to create sparse model" in content or "No models created" in content:
+            return (
+                "COLMAP Reconstruction Failed: Structure-from-Motion could not initialize a 3D coordinate model. "
+                "Ensure photos have high contrast, sharp focus (avoid motion blur), distinct surface texture, "
+                "and consistent lighting across at least 5-15 overlapping views."
+            )
+        return (
+            "COLMAP Sparse Reconstruction failed to register camera poses. "
+            "Please check image overlap (minimum 60-80% overlap), lighting uniformity, and ensure photographs "
+            "capture common structural features across multiple viewpoints."
+        )
 
     def run_reconstruction(
         self,
@@ -205,7 +272,8 @@ class ColmapEngine(PhotogrammetryEngine):
             "--output_path", str(sparse_dir),
         ]
         if not self._run_stage(cmd_mapper, "SPARSE_RECONSTRUCTION", log_file, progress_callback, 55):
-            raise RuntimeError("COLMAP Sparse Reconstruction (Mapper) failed. No model registered.")
+            diag = self._diagnose_mapper_failure(log_file)
+            raise RuntimeError(diag)
 
         # Sparse sub-model 0
         model_0_dir = sparse_dir / "0"
@@ -214,7 +282,8 @@ class ColmapEngine(PhotogrammetryEngine):
             if (sparse_dir / "cameras.bin").exists() or (sparse_dir / "cameras.txt").exists():
                 model_0_dir = sparse_dir
             else:
-                raise RuntimeError("COLMAP did not produce any sparse reconstruction models.")
+                diag = self._diagnose_mapper_failure(log_file)
+                raise RuntimeError(diag)
 
         # Convert sparse model to PLY
         sparse_ply = workspace_dir / "sparse.ply"
@@ -243,7 +312,7 @@ class ColmapEngine(PhotogrammetryEngine):
             undistort_ok = self._run_stage(cmd_undistort, "IMAGE_UNDISTORTION", log_file, progress_callback, 75)
 
             if undistort_ok and colmap_info["cuda_available"]:
-                # Stage 5: PatchMatchStereo
+                # Stage 5: PatchMatchStereo (CUDA)
                 cmd_stereo = [
                     colmap_bin,
                     "patch_match_stereo",
@@ -275,31 +344,65 @@ class ColmapEngine(PhotogrammetryEngine):
                         ]
                         if self._run_stage(cmd_mesh, "MESH_GENERATION", log_file, progress_callback, 95) and mesh_ply.exists():
                             mesh_ply_path = str(mesh_ply)
+            elif generate_mesh and sparse_ply.exists():
+                # CPU-Compatible Surface Meshing via Open3D
+                if progress_callback:
+                    progress_callback("MESH_GENERATION", 85, "Generating 3D surface mesh via Open3D Poisson Reconstruction (CPU Mode)...")
+                try:
+                    import numpy as np
+                    import open3d as o3d
+                    pcd = o3d.io.read_point_cloud(str(sparse_ply))
+                    if len(pcd.points) >= 10:
+                        pcd.estimate_normals(
+                            search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
+                        )
+                        pcd.orient_normals_towards_camera_location(camera_location=np.array([0.0, 0.0, 2.0]))
+                        mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=7)
+                        # Filter out low-density boundary noise if sufficient vertices
+                        if len(mesh.vertices) > 20:
+                            dens_arr = np.asarray(densities)
+                            cutoff = np.quantile(dens_arr, 0.05)
+                            mesh.remove_vertices_by_mask(dens_arr < cutoff)
+                        mesh_ply = workspace_dir / "mesh.ply"
+                        o3d.io.write_triangle_mesh(str(mesh_ply), mesh)
+                        if mesh_ply.exists():
+                            mesh_ply_path = str(mesh_ply)
+                except Exception as ex:
+                    with open(log_file, "a", encoding="utf-8") as lf:
+                        lf.write(f"\n[Open3D Notice] CPU surface meshing note: {str(ex)}\n")
 
-        # Parse metrics from files or text
+
+        # Parse metrics, camera poses, and sparse points from COLMAP model files
         total_time = round(time.time() - start_time, 2)
         log_content = ""
         if log_file.exists():
             with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
                 log_content = f.read()
 
+        parsed_model = parse_colmap_model(model_0_dir)
+        camera_poses = parsed_model.get("camera_poses", [])
+        sparse_pts = parsed_model.get("sparse_point_count", 0)
+        reproj_err = parsed_model.get("mean_reprojection_error")
+        bbox = parsed_model.get("bounding_box", {})
+
         return {
             "engine": "colmap",
             "engine_version": colmap_info.get("version", "COLMAP"),
             "is_demo": False,
-            "registered_image_count": len(image_paths),
-            "sparse_point_count": 0,  # Will be enriched by PointCloudProcessor
+            "registered_image_count": parsed_model.get("registered_image_count", len(image_paths)),
+            "sparse_point_count": sparse_pts,
             "dense_point_count": 0,
             "mesh_vertex_count": 0,
             "mesh_triangle_count": 0,
+            "mean_reprojection_error": reproj_err,
             "sparse_point_cloud_path": str(sparse_ply) if sparse_ply.exists() else None,
             "dense_point_cloud_path": dense_ply_path,
             "mesh_path": mesh_ply_path,
             "workspace_path": str(workspace_dir),
             "log_path": str(log_file),
             "logs": log_content,
-            "camera_poses": [],
-            "bounding_box": {},
+            "camera_poses": camera_poses,
+            "bounding_box": bbox,
             "metadata": {
                 "elapsed_seconds": total_time,
                 "cuda_used": bool(use_gpu),

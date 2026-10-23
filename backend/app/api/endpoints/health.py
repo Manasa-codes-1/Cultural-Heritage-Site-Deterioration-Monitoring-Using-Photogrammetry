@@ -12,6 +12,13 @@ router = APIRouter(tags=["Health & System"])
 
 
 def check_colmap() -> tuple[bool, str | None]:
+    try:
+        from app.photogrammetry.colmap_engine import ColmapEngine
+        avail = ColmapEngine().check_availability()
+        if avail.get("available"):
+            return True, avail.get("binary_path")
+    except Exception:
+        pass
     cmd = shutil.which(settings.COLMAP_PATH) or shutil.which("colmap")
     return (cmd is not None, cmd)
 

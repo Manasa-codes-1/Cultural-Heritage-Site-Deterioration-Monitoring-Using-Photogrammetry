@@ -1,0 +1,89 @@
+{
+  "accuracy": 0.25,
+  "macro_precision": 0.0625,
+  "macro_recall": 0.25,
+  "macro_f1": 0.1,
+  "total_evaluated_samples": 20,
+  "per_class": {
+    "brick": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 5
+    },
+    "granite": {
+      "precision": 0.25,
+      "recall": 1.0,
+      "f1_score": 0.4,
+      "support": 5
+    },
+    "lime_mortar": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 5
+    },
+    "sandstone": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 5
+    }
+  },
+  "confusion_matrix": [
+    [
+      0,
+      5,
+      0,
+      0
+    ],
+    [
+      0,
+      5,
+      0,
+      0
+    ],
+    [
+      0,
+      5,
+      0,
+      0
+    ],
+    [
+      0,
+      5,
+      0,
+      0
+    ]
+  ],
+  "class_labels": [
+    "brick",
+    "granite",
+    "lime_mortar",
+    "sandstone"
+  ],
+  "evaluation_timestamp": "2026-10-23T09:47:01Z",
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.5119,
+      "train_accuracy": 0.2292,
+      "val_loss": 1.3864,
+      "val_accuracy": 0.25
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.2722,
+      "train_accuracy": 0.4583,
+      "val_loss": 1.3864,
+      "val_accuracy": 0.25
+    },
+    {
+      "epoch": 3,
+      "train_loss": 1.1751,
+      "train_accuracy": 0.5417,
+      "val_loss": 1.3867,
+      "val_accuracy": 0.25
+    }
+  ]
+}

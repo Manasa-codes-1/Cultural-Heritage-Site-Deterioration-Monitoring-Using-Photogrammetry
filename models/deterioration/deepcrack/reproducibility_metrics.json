@@ -1,0 +1,83 @@
+{
+  "model_identity": {
+    "name": "DeepCrack Multi-Scale Feature-Fused Convolutional Neural Network",
+    "architecture": "deepcrack_vgg16_fused",
+    "checkpoint_file": "MyDeepCrack_final.pth",
+    "checkpoint_size_mb": 123.65,
+    "source_citation": "Liu et al., 'DeepCrack: A Deep Hierarchical Feature Learning Architecture for Crack Segmentation', IEEE T-ITS"
+  },
+  "evaluation_protocol": {
+    "metric_definitions": {
+      "pixel_accuracy": "(TP + TN) / (TP + TN + FP + FN) - Ratio of correctly predicted crack & non-crack pixels",
+      "pixel_precision": "TP / (TP + FP) - Ratio of predicted crack pixels that are authentic cracks",
+      "pixel_recall_sensitivity": "TP / (TP + FN) - Ratio of ground-truth crack pixels detected",
+      "specificity": "TN / (TN + FP) - Ratio of background pixels correctly rejected",
+      "pixel_f1_dice": "2*TP / (2*TP + FP + FN) - Harmonic mean of precision and recall",
+      "pixel_iou_jaccard": "TP / (TP + FP + FN) - Intersection over union of crack areas"
+    },
+    "evaluation_threshold": 0.5,
+    "input_resolution": "512x512",
+    "execution_device": "Intel CPU (PyTorch, 4 threads)"
+  },
+  "full_benchmark_237_images": {
+    "dataset": "DeepCrack Official Held-Out Validation Dataset",
+    "sample_count": 237,
+    "training_epochs": 150,
+    "pixel_accuracy": 0.98525,
+    "pixel_recall_sensitivity": 0.70878,
+    "pixel_specificity": 0.99796,
+    "pixel_precision": 0.8654,
+    "pixel_f1": 0.77926,
+    "pixel_iou": 0.63836,
+    "provenance_source": "val_acc.csv"
+  },
+  "live_sample_reproduction": {
+    "sample_count": 2,
+    "total_elapsed_seconds": 90.41,
+    "avg_seconds_per_image": 45.2,
+    "pixel_accuracy": 0.75242,
+    "pixel_precision": 0.08796,
+    "pixel_recall": 0.73805,
+    "pixel_specificity": 0.75288,
+    "pixel_f1": 0.15718,
+    "pixel_iou": 0.08529,
+    "confusion_matrix": {
+      "TP": 12104,
+      "FP": 125509,
+      "FN": 4296,
+      "TN": 382379
+    },
+    "per_image_results": [
+      {
+        "image": "111212-1.jpg",
+        "original_resolution": "384x544",
+        "inference_resolution": "512x512",
+        "tp": 3939,
+        "fp": 66186,
+        "fn": 828,
+        "tn": 191191,
+        "accuracy": 0.7444,
+        "precision": 0.0562,
+        "recall": 0.8263,
+        "f1": 0.1052,
+        "iou": 0.0555,
+        "time_seconds": 44.35
+      },
+      {
+        "image": "11125-1.jpg",
+        "original_resolution": "384x544",
+        "inference_resolution": "512x512",
+        "tp": 8165,
+        "fp": 59323,
+        "fn": 3468,
+        "tn": 191188,
+        "accuracy": 0.7605,
+        "precision": 0.121,
+        "recall": 0.7019,
+        "f1": 0.2064,
+        "iou": 0.1151,
+        "time_seconds": 46.05
+      }
+    ]
+  }
+}

@@ -370,6 +370,8 @@ export interface MaterialModelSummary {
   };
   path?: string;
   disclaimer?: string;
+  validation_status?: string;
+  is_validated?: boolean;
 }
 
 export interface DatasetValidationReport {
